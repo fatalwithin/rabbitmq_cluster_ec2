@@ -1,0 +1,16 @@
+---
+- hosts: localhost
+  connection: local
+  roles:
+    - deploy_instances
+
+- hosts: rabbit
+  roles:
+    - install_rabbitmq
+    - cluster_setup
+    - monitoring_setup
+
+- hosts: localhost
+  connection: local
+  roles:
+    - load_balancing

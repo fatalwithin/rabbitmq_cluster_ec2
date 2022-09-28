@@ -1,0 +1,18 @@
+---
+- include_tasks: prerequisites.yml
+
+- include_tasks: hosts.yml
+  when: update_hosts
+
+- include_tasks: install.yml
+
+- include_tasks: tls.yml
+  when: enable_tls
+
+- include_tasks: config.yml
+
+- include_tasks: service.yml
+
+- include_tasks: create_users.yml
+# uncomment following section to enable HA queues
+# - include_tasks: enable_ha_queues

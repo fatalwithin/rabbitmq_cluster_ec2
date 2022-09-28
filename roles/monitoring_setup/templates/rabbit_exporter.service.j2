@@ -1,0 +1,16 @@
+[Unit]
+Description=RabbitMQ Exporter for Prometheus
+After=network.target
+
+[Service]
+Environment="RABBIT_EXPORTERS=exchange,node,queue,memory"
+Environment="RABBIT_USER={{ rabbit_user }}"
+Environment="RABBIT_PASSWORD={{ rabbit_password }}"
+Environment="PUBLISH_PORT={{ rabbit_exporter_port }}"
+User={{ rabbit_exporter_user }}
+Group={{ rabbit_exporter_user }}
+Type=simple
+ExecStart=/usr/local/bin/rabbitmq_exporter
+
+[Install]
+WantedBy=multi-user.target

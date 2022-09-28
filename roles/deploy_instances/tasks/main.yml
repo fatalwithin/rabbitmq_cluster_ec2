@@ -1,0 +1,194 @@
+- name: Facts
+  block:
+    - name: Get instances facts
+      amazon.aws.ec2_instance_info:
+        filters:
+          "tag:Name": "rabbitmq-*"
+        profile: "{{ aws_profile }}"
+        region: "{{ region }}"
+      register: rabbit_instances
+
+    - name: Instances ID
+      debug:
+        msg: "ID: {{ item.instance_id }} - State: {{ item.state.name }} - Internal IP: {{ item.private_ip_address }}"
+      loop: "{{ rabbit_instances.instances }}"
+      ignore_errors: true
+
+  tags: always
+
+- name: Create RabbitMQ security group
+  amazon.aws.ec2_group:
+    name: RabbitMQ
+    description: "RabbitMQ-specific access rules and ports"
+    vpc_id: "{{ vpc_id }}"
+    profile: "{{ aws_profile }}"
+    region: "{{ region }}"
+    rules:
+      - proto: tcp
+        ports:
+          - "{{ prometheus_exporter_port }}"
+          - "{{ rabbit_exporter_port }}"
+        cidr_ip: "{{ monitoring_host }}/32"
+        rule_desc: allow metrics scraping from Prometheus server
+      - proto: tcp
+        ports:
+          - "{{ rabbitmq_tls_port }}" # AMQP TLS
+          - "{{ rabbitmq_epmd_port }}" # epmd
+          - "{{ rabbitmq_stream_port_1 }}" # Stream protocol
+          - "{{ rabbitmq_stream_port_2 }}" # Stream protocol
+          - "{{ rabbitmq_mgmt_port }}" # HTTP API
+          - "{{ rabbitmq_http_api_port }}" # HTTP API
+          - "{{ rabbitmq_mqtt_port_1 }}" # MQTT clients
+          - "{{ rabbitmq_mqtt_port_2 }}" # MQTT clients
+          - "{{ rabbitmq_node_port }}" # inter-node communications
+        cidr_ip: 10.0.0.0/8
+        rule_desc: allow entire RabbitMQ traffic for all private networks
+      - proto: tcp
+        ports:
+          - "{{ rabbitmq_amqp_port }}" # AMQP
+        cidr_ip: 0.0.0.0/0
+        rule_desc: allow AMQP traffic from everywhere
+  register: rabbit_sg
+
+- name: Create instances
+  block:
+    - name: Create first node
+      amazon.aws.ec2_instance:
+        ebs_optimized: yes
+        instance_initiated_shutdown_behavior: stop
+        termination_protection: yes
+        name: "{{ node_01_hostname }}"
+        vpc_subnet_id: "{{ public_subnet_id_01 }}"
+        profile: "{{ aws_profile }}"
+        image_id: "{{ image_id }}"
+        region: "{{ region }}"
+        instance_type: "{{ instance_type }}"
+        key_name: "{{ key_pair_name }}"
+        network:
+          assign_public_ip: yes
+        security_groups:
+          - "{{ rabbit_sg.group_name }}"
+          - "aws.umb.private.ssh"
+          - "Gitlab-runners"
+          - "Prod node"
+        tags:
+          Env: "{{ environment_value }}"
+          App: rabbitmq
+        volumes:
+          - device_name: /dev/sda1
+            ebs:
+              volume_size: "{{ volume_size }}"
+              delete_on_termination: true
+        state: started
+      register: rabbit_first_node
+
+    - name: Create second node
+      amazon.aws.ec2_instance:
+        ebs_optimized: yes
+        instance_initiated_shutdown_behavior: stop
+        termination_protection: yes
+        name: "{{ node_02_hostname }}"
+        vpc_subnet_id: "{{ public_subnet_id_02 }}"
+        profile: "{{ aws_profile }}"
+        image_id: "{{ image_id }}"
+        region: "{{ region }}"
+        instance_type: "{{ instance_type }}"
+        key_name: "{{ key_pair_name }}"
+        network:
+          assign_public_ip: yes
+        security_groups:
+          - "{{ rabbit_sg.group_name }}"
+          - "aws.umb.private.ssh"
+          - "Gitlab-runners"
+          - "Prod node"
+        tags:
+          Env: "{{ environment_value }}"
+          App: rabbitmq
+        volumes:
+          - device_name: /dev/sda1
+            ebs:
+              volume_size: "{{ volume_size }}"
+              delete_on_termination: true
+        state: started
+      register: rabbit_second_node
+
+    - name: Create third node
+      amazon.aws.ec2_instance:
+        ebs_optimized: yes
+        instance_initiated_shutdown_behavior: stop
+        termination_protection: yes
+        name: "{{ node_03_hostname }}"
+        vpc_subnet_id: "{{ public_subnet_id_03 }}"
+        profile: "{{ aws_profile }}"
+        image_id: "{{ image_id }}"
+        region: "{{ region }}"
+        instance_type: "{{ instance_type }}"
+        key_name: "{{ key_pair_name }}"
+        network:
+          assign_public_ip: yes
+        security_groups:
+          - "{{ rabbit_sg.group_name }}"
+          - "aws.umb.private.ssh"
+          - "Gitlab-runners"
+          - "Prod node"
+        tags:
+          Env: "{{ environment_value }}"
+          App: rabbitmq
+        volumes:
+          - device_name: /dev/sda1
+            ebs:
+              volume_size: "{{ volume_size }}"
+              delete_on_termination: true
+        state: started
+      register: rabbit_third_node
+
+- name: Set facts
+  block:
+    - name: Save data about created RabbitMQ nodes
+      ansible.builtin.set_fact:
+        first_node:
+          public_ip_address: "{{ rabbit_first_node.instances.0.public_ip_address }}"
+          public_dns_name: "{{ rabbit_first_node.instances.0.public_dns_name }}"
+          private_ip_address: "{{ rabbit_first_node.instances.0.private_ip_address }}"
+          private_dns_name: "{{ rabbit_first_node.instances.0.private_dns_name }}"
+          name: "{{ rabbit_first_node.instances.0.tags.Name }}"
+          id: "{{ rabbit_first_node.instances.0.instance_id }}"
+        second_node:
+          public_ip_address: "{{ rabbit_second_node.instances.0.public_ip_address }}"
+          public_dns_name: "{{ rabbit_second_node.instances.0.public_dns_name }}"
+          private_ip_address: "{{ rabbit_second_node.instances.0.private_ip_address }}"
+          private_dns_name: "{{ rabbit_second_node.instances.0.private_dns_name }}"
+          name: "{{ rabbit_second_node.instances.0.tags.Name }}"
+          id: "{{ rabbit_second_node.instances.0.instance_id }}"
+        third_node:
+          public_ip_address: "{{ rabbit_third_node.instances.0.public_ip_address }}"
+          public_dns_name: "{{ rabbit_third_node.instances.0.public_dns_name }}"
+          private_ip_address: "{{ rabbit_third_node.instances.0.private_ip_address }}"
+          private_dns_name: "{{ rabbit_third_node.instances.0.private_dns_name }}"
+          name: "{{ rabbit_third_node.instances.0.tags.Name }}"
+          id: "{{ rabbit_third_node.instances.0.instance_id }}"
+        rabbit_sg:
+          id: "{{ rabbit_sg.group_id }}"
+
+- name: Add first RabbitMQ node to temp inventory
+  add_host:
+    hostname: "{{ first_node.name }}"
+    groups:
+      - rabbit
+    ansible_host: "{{ first_node.public_ip_address }}"
+
+- name: Add second RabbitMQ node to temp inventory
+  add_host:
+    hostname: "{{ second_node.name }}"
+    groups:
+      - rabbit
+      - rabbit_workers
+    ansible_host: "{{ second_node.public_ip_address }}"
+
+- name: Add third RabbitMQ node to temp inventory
+  add_host:
+    hostname: "{{ third_node.name }}"
+    groups:
+      - rabbit
+      - rabbit_workers
+    ansible_host: "{{ third_node.public_ip_address }}"

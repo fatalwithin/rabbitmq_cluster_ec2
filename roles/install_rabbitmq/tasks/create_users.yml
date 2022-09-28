@@ -1,0 +1,23 @@
+---
+# rc 70: user already exists
+- name: create rabbit user
+  shell: rabbitmqctl add_user {{ rabbit_local_user }} {{ rabbit_local_password }}
+  register: res
+  failed_when: res.rc != 70 and res.rc != 0
+  changed_when: res.rc != 70
+
+- name: list permissions for rabbit user
+  shell: rabbitmqctl list_permissions
+  register: list_permissions
+  changed_when: false
+
+- name: set tags for rabbit user
+  shell: rabbitmqctl set_user_tags {{ rabbit_local_user }} administrator
+
+- name: set permissions on / vhost
+  shell: rabbitmqctl set_permissions -p / {{ rabbit_local_user }} ".*" ".*" ".*"
+  when: list_permissions.stdout.find("{{ rabbit_local_user }}") == -1
+
+- name: delete default user
+  shell: rabbitmqctl delete_user guest
+  when: list_permissions.stdout.find("guest") != -1

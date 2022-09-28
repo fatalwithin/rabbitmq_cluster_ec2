@@ -1,0 +1,55 @@
+---
+- name: Download and unarchive rabbit_exporter into temporary location.
+  unarchive:
+    src: "{{ rabbit_exporter_download_url }}"
+    dest: /tmp
+    remote_src: true
+    mode: 0755
+  register: rabbit_exporter_download_check
+
+- name: Move rabbit_exporter binary into place.
+  copy:
+    src: "/tmp/rabbitmq_exporter"
+    dest: "{{ rabbit_exporter_bin_path }}"
+    mode: 0755
+    remote_src: true
+  notify: restart rabbit_exporter
+  when: rabbit_exporter_download_check is changed
+
+- name: Create rabbit_exporter group.
+  group:
+    name: "{{ rabbit_exporter_user }}"
+    state: present
+
+- name: Create rabbit_exporter user.
+  user:
+    name: "{{ rabbit_exporter_user }}"
+    shell: /sbin/nologin
+    state: present
+    groups: "{{ rabbit_exporter_user }}"
+
+- name: Copy the rabbit_exporter systemd unit file.
+  template:
+    src: rabbit_exporter.service.j2
+    dest: /etc/systemd/system/rabbit_exporter.service
+    mode: 0644
+  register: rabbit_exporter_service
+
+- name: Reload systemd daemon if unit file is changed.
+  systemd:
+    daemon_reload: true
+  notify: restart rabbit_exporter
+  when: rabbit_exporter_service is changed
+
+- name: Ensure rabbit_exporter is running and enabled at boot.
+  service:
+    name: rabbit_exporter
+    state: "{{ rabbit_exporter_state }}"
+    enabled: "{{ rabbit_exporter_enabled }}"
+
+- name: Verify rabbit_exporter is responding to requests.
+  uri:
+    url: http://localhost:{{ rabbit_exporter_port }}/
+    return_content: true
+  register: metrics_output
+  failed_when: "'Metrics' not in metrics_output.content"

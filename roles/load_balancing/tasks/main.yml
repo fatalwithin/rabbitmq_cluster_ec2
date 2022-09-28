@@ -1,0 +1,82 @@
+---
+- name: Create a target group with rabbit nodes targets (management)
+  community.aws.elb_target_group:
+    name: rabbitmq-mgmt
+    protocol: http
+    port: 80
+    vpc_id: "{{ your_vpc_id }}"
+    profile: "{{ your_aws_profile }}"
+    region: "{{ your_region }}"
+    health_check_protocol: http
+    health_check_path: /
+    successful_response_codes: "200,250-260"
+    targets:
+      - Id: "{{ hostvars['localhost']['first_node']['id'] }}"
+        Port: 15672
+      - Id: "{{ hostvars['localhost']['second_node']['id'] }}"
+        Port: 15672
+      - Id: "{{ hostvars['localhost']['third_node']['id'] }}"
+        Port: 15672
+    state: present
+    wait_timeout: 200
+    wait: no
+  register: tg_rabbitmq_mgmt
+
+- name: Create a target group with rabbit nodes targets (data)
+  community.aws.elb_target_group:
+    name: rabbitmq-data
+    protocol: tcp
+    port: 5672
+    vpc_id: "{{ your_vpc_id }}"
+    profile: "{{ your_aws_profile }}"
+    region: "{{ your_region }}"
+    health_check_protocol: tcp
+    targets:
+      - Id: "{{ hostvars['localhost']['first_node']['id'] }}"
+        Port: 5672
+      - Id: "{{ hostvars['localhost']['second_node']['id'] }}"
+        Port: 5672
+      - Id: "{{ hostvars['localhost']['third_node']['id'] }}"
+        Port: 5672
+    state: present
+    wait_timeout: 200
+    wait: no
+  register: tg_rabbitmq_data
+
+- name: Create NLB for RabbitMQ data
+  community.aws.elb_network_lb:
+    name: rabbitmq-lb-data
+    profile: "{{ your_aws_profile }}"
+    region: "{{ your_region }}"
+    subnets:
+      - "{{ your_public_subnet_id_01 }}"
+      - "{{ your_public_subnet_id_02 }}"
+      - "{{ your_public_subnet_id_03 }}"
+    listeners:
+      - Protocol: TCP # Required. The protocol for connections from clients to the load balancer (TCP, TLS, UDP or TCP_UDP) (case-sensitive).
+        Port: 5672 # Required. The port on which the load balancer is listening.
+        DefaultActions:
+          - Type: forward # Required. Only 'forward' is accepted at this time
+            TargetGroupName: "{{ tg_rabbitmq_data.target_group_name }}" # Required. The name of the target group
+    state: present
+
+- name: Create ALB for RabbitMQ management
+  community.aws.elb_application_lb:
+    name: rabbitmq-lb-mgmt
+    profile: "{{ your_aws_profile }}"
+    region: "{{ your_region }}"
+    security_groups:
+      # - "{{ hostvars['localhost']['rabbit_sg']['id'] }}"
+      - "{{ your_lb_security_group }}"
+    subnets:
+      - "{{ your_public_subnet_id_01 }}"
+      - "{{ your_public_subnet_id_02 }}"
+      - "{{ your_public_subnet_id_03 }}"
+    listeners:
+      - Protocol: HTTP # Required. The protocol for connections from clients to the load balancer (HTTP or HTTPS) (case-sensitive).
+        Port: 80 # Required. The port on which the load balancer is listening.
+        # The security policy that defines which ciphers and protocols are supported. The default is the current predefined security policy.
+        DefaultActions:
+          - Type: forward # Required.
+            TargetGroupName: "{{ tg_rabbitmq_mgmt.target_group_name }}" # Required. The name of the target group
+    state: present

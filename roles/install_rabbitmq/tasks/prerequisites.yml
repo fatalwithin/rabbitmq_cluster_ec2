@@ -1,0 +1,15 @@
+---
+# Setup installation repositories
+# Standart repository for Debian / Ubuntu (https://www.rabbitmq.com/install-debian.html)
+- name: Install prerequisites
+  apt:
+    name: "{{ item }}"
+    update_cache: yes
+    state: present
+  with_items:
+    # - apt-transport-https
+    # - ca-certificates
+    # - python3-pip
+    - curl
+    - software-properties-common
+    - gnupg

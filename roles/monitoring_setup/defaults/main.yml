@@ -1,0 +1,18 @@
+---
+# See available releases: https://github.com/kbudde/rabbitmq_exporter/releases/
+rabbit_exporter_version: "1.0.0-RC19"
+rabbit_exporter_arch: "amd64"
+rabbit_exporter_port: "{{ rabbit_exporter_port }}"
+rabbit_exporter_user: rabbit_exporter
+# user and pass for connection to local RabbitMQ
+rabbit_user: "{{ rabbit_local_user }}"
+rabbit_password: "{{ rabbit_local_password }}"
+
+rabbit_exporter_download_url: https://github.com/kbudde/rabbitmq_exporter/releases/download/v{{ rabbit_exporter_version }}/rabbitmq_exporter_{{ rabbit_exporter_version }}_linux_{{ rabbit_exporter_arch }}.tar.gz
+
+rabbit_exporter_bin_path: /usr/local/bin/rabbitmq_exporter
+rabbit_exporter_state: started
+rabbit_exporter_enabled: true
+
+# url to rabbitMQ management plugin (must start with http(s)://)
+rabbit_url: "http://127.0.0.1:15672"

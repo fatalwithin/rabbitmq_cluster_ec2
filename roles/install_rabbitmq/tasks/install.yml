@@ -1,0 +1,27 @@
+---
+- name: Install gdebi
+  apt:
+    update_cache: yes
+    force: yes
+    pkg: gdebi
+    state: present
+
+- name: Uninstall rabbitmq-server (if installed)
+  apt:
+    update_cache: yes
+    force: yes
+    pkg: "{{ item }}"
+    state: absent
+  with_items:
+    - rabbitmq-server
+
+- name: Install rabbitmq-server using cloudsmith repo
+  ansible.builtin.script: files/rabbit_install.sh
+
+- name: Customize logrotate rules
+  template:
+    src: etc/logrotate.d/rabbitmq-server.j2
+    dest: /etc/logrotate.d/rabbitmq-server
+    owner: root
+    group: root
+    mode: 0644

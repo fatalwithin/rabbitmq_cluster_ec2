@@ -1,0 +1,4 @@
+---
+- include_tasks: erlang_cookie.yml
+
+- include_tasks: create_cluster.yml

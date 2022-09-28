@@ -1,0 +1,5 @@
+---
+- name: restart rabbit_exporter
+  service:
+    name: rabbit_exporter
+    state: restarted

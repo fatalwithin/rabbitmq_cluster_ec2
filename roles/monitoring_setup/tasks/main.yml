@@ -1,0 +1,6 @@
+---
+# tasks file for rabbit_exporter
+- name: Installing rabbit exporter
+  import_tasks: rabbit_exporter.yml
+  tags:
+    - rabbit_exporter
